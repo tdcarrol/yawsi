@@ -22,4 +22,4 @@ while 1:
     x = sp.Popen(['/home/derek/x.sh'], stdout = sp.PIPE)
 
     for line in x.stdout:
-        print line
+        print line,
