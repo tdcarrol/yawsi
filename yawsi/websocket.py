@@ -10,6 +10,9 @@ import urlparse
 
 __all__ = ('websocket', 'WebSocketType')
 
+_wraps_builtin = functools.partial(functools.wraps, updated = (),
+                                   assigned = ('__name__', '__doc__'))
+
 class _WebSocketType(type):
     """
 
@@ -43,29 +46,33 @@ class _WebSocket(socket.SocketType):
 
     path = None
 
-    @functools.wraps(socket.SocketType.accept)
+    @_wraps_builtin(socket.SocketType.accept)
     def accept(self):
         sock, addr = self._sock.accept()
+        print 'ACCEPTED'
 
         http_method, self.path, http_version, headers = self._get_data(sock)
         version = headers.get('Sec-WebSocket-Version')
+        print headers
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
         websocket = WSType(_sock = sock)
-        websocket.handshake(http_method, self.path, http_version, headers)
+        websocket.server_handshake(http_method, self.path, http_version,
+                                   headers)
+        print 'HANDSHAKEN'
 
         return websocket, addr
 
-    @functools.wraps(socket.SocketType.dup)
+    @_wraps_builtin(socket.SocketType.dup)
     def dup(self):
         return self.__class__(_sock = self._sock)
 
-    @functools.wraps(socket.SocketType.connect)
+    @_wraps_builtin(socket.SocketType.connect)
     def connect(self, address):
         parsed = urlparse.urlsplit(address)
         # TODO
 
-    def server_handshake(self, headers):
+    def server_handshake(self, http_method, path, http_version, headers):
         """
 
 
@@ -87,18 +94,40 @@ class _WebSocket(socket.SocketType):
 
         """
 
-        sockfile = sock.makefile()
-        lines = [line for line in sockfile]
-        http_method, path, http_version = line[0].split()
-        headers = dict(self._parse_header(line) for line in lines[1:])
+        def get_lines(sockfile):
+            line = sockfile.readline()
 
+            if not line or not line.strip():
+                raise StopIteration
+
+            yield line
+
+        sockfile = sock.makefile()
+        print 'GETTING LINES'
+        lines = [line for line in get_lines(sockfile)]
+        request = lines[0].split()
+
+        if len(request) < 3:
+            print request
+            raise # TODO
+
+        http_method, path, http_version = request
+
+        headers = dict(self._parse_header(line) for line in lines[1:] if
+                                          line.strip())
         return http_method, path, http_version, headers
 
     def _parse_header(self, line):
-        raw_header, raw_value = line.split(u':')
+        raw_header, _, raw_value = line.partition(u':')
 
         header = raw_header.lower().strip()
         value = raw_value.strip()
+
+        if not header:
+            raise # TODO
+
+        if not value:
+            raise # TODO
 
         return header, value
 
@@ -109,8 +138,8 @@ class _WebSocketDraftHybi07(WebSocketType):
     version = '7'
 
     @functools.wraps(WebSocketType.server_handshake)
-    def server_handshake(self, path, headers):
-        pass
+    def server_handshake(self, http_method, path, http_version, headers):
+        print path, headers
 
 
 @functools.wraps(socket.create_connection)
