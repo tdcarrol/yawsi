@@ -17,9 +17,11 @@ s.bind(('localhost', 8888))
 s.listen(1)
 
 while 1:
-    sock, addr = s.accept()
-    sys.stdout = sys.stderr = sock.makefile(bufsize = 0)
-    x = sp.Popen(['/home/derek/x.sh'], stdout = sp.PIPE)
+    conn, addr = s.accept()
+    sys.stdout = conn.makefile(bufsize = 0)
+    x = sp.Popen(['/bin/ls', '/'], stdout = sp.PIPE)
 
     for line in x.stdout:
         print line,
+
+    conn.close()
