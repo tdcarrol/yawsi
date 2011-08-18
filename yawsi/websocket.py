@@ -7,8 +7,13 @@
 import base64
 import functools
 import hashlib
-import socket
+import types
 import urlparse
+
+try:
+    from gevent import socket
+except ImportError:
+    import socket
 
 __all__ = ('websocket', 'WebSocketType')
 
@@ -50,24 +55,24 @@ class _WebSocket(socket.SocketType):
 
     def __init__(self, family = socket.AF_INET, type = socket.SOCK_STREAM,
                  proto = 0, _sock = None):
-        if _sock is None:
-            _sock = socket._realsocket(family, type, proto)
-
-        self._sock = _sock
+        super(_WebSocket, self).__init__(family, type, proto, _sock)
 
         for method in socket._delegate_methods:
-            if not hasattr(self, method):
-                setattr(self, method, getattr(_sock, method))
+            if hasattr(self.__class__, method):
+                cls_method = getattr(self.__class__, method)
+                bound_method = types.MethodType(cls_method, self,
+                                                self.__class__)
+                setattr(self, method, bound_method)
 
     @_wraps_builtin(socket.SocketType.accept)
     def accept(self):
-        sock, addr = self._sock.accept()
+        conn, addr = super(self.__class__, self).accept()
 
-        http_method, self.path, http_version, headers = self._get_data(sock)
+        http_method, self.path, http_version, headers = self._get_data(conn)
         version = headers.get('sec-websocket-version')
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
-        websocket = WSType(_sock = sock)
+        websocket = WSType(_sock = conn)
         websocket.server_handshake(http_method, self.path, http_version,
                                    headers)
 
@@ -82,7 +87,6 @@ class _WebSocket(socket.SocketType):
         parsed = urlparse.urlsplit(address)
         # TODO
 
-    @_wraps_builtin(socket.SocketType.makefile)
     def makefile(self, mode = 'r', bufsize = -1):
         return socket._fileobject(self, mode, bufsize)
 
@@ -102,14 +106,14 @@ class _WebSocket(socket.SocketType):
 
         raise NotImplementedError
 
-    def _get_data(self, sock):
+    def _get_data(self, conn):
         """
 
 
         """
 
         def get_lines():
-            sockfile = sock.makefile()
+            sockfile = conn.makefile()
 
             while 1:
                 line = sockfile.readline()
@@ -166,29 +170,24 @@ class _WebSocketDraftHybi07(WebSocketType):
         key = base64.b64encode(hash)
 
         handshake = self._SERVER_HANDSHAKE % {'key': key}
-        self._sock.send(handshake)
+        super(self.__class__, self).send(handshake)
 
     @_wraps_builtin(WebSocketType.close)
     def close(self):
         # TODO: Close correctly.
-        self._sock.send('\x88')
-        self._sock.close()
+        super(self.__class__, self).send('\x88')
+        super(self.__class__, self).close()
 
     @_wraps_builtin(WebSocketType.send)
     def send(self, data, flags = 0):
+        if isinstance(data, memoryview):
+            data = data.tobytes()
+
         data = data.encode('utf-8')
         payload_len = self._get_payload_length(data)
         packet = '\x81' + payload_len + data
 
-        return self._sock.send(packet)
-
-    @_wraps_builtin(WebSocketType.sendall)
-    def sendall(self, data, flags = 0):
-        if isinstance(data, memoryview):
-            data = data.tobytes()
-
-        self.send(data, flags)
-        # TODO: Fragmenting
+        return super(self.__class__, self).send(packet)
 
     def _get_payload_length(self, data):
         sz = len(data)
