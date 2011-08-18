@@ -19,7 +19,7 @@ s.listen(1)
 while 1:
     conn, addr = s.accept()
     sys.stdout = conn.makefile(bufsize = 0)
-    x = sp.Popen(['/bin/ls', '/'], stdout = sp.PIPE)
+    x = sp.Popen(['/bin/ls', '/'], stdout = sp.PIPE, stderr = sp.STDOUT)
 
     for line in x.stdout:
         print line,
