@@ -4,8 +4,6 @@
 
 """
 
-import sys
-
 import setuptools
 
 install_requires = [
@@ -13,9 +11,6 @@ install_requires = [
 
 tests_require = [
 ]
-
-if sys.version_info < (2, 7):
-    tests_require.append('unittest2')
 
 setuptools.setup(
     name = 'yawsi',
