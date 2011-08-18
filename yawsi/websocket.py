@@ -177,7 +177,7 @@ class _WebSocketDraftHybi00(WebSocketType):
     @functools.wraps(WebSocketType._server_handshake)
     def _server_handshake(self, http_method, path, http_version, headers):
         pass
-    
+
     @_wraps_builtin(WebSocketType.close)
     def close(self):
         pass
@@ -185,7 +185,7 @@ class _WebSocketDraftHybi00(WebSocketType):
     @_wraps_builtin(WebSocketType.send)
     def send(self, data, flags = 0):
         pass
-    
+
 
 class _WebSocketDraftHybi07(WebSocketType):
     version = WEBSOCK_VERSION_DRAFT_HYBI_07
