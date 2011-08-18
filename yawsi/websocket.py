@@ -12,10 +12,16 @@ import urlparse
 
 try:
     from gevent import socket
+    from gevent import ssl
 except ImportError:
     import socket
+    import ssl
 
 __all__ = ('websocket', 'WebSocketType')
+
+WEBSOCK_VERSION_DRAFT_HYBI_00 = WEBSOCK_VERSION_DRAFT_HIXIE_76 = '0'
+WEBSOCK_VERSION_DRAFT_HYBI_07 = '7'
+WEBSOCK_VERSION_DRAFT_HYBI_10 = '10'
 
 _wraps_builtin = functools.partial(functools.wraps, updated = (),
                                    assigned = ('__name__', '__doc__'))
@@ -69,7 +75,7 @@ class _WebSocket(socket.SocketType):
         conn, addr = super(self.__class__, self).accept()
 
         http_method, self.path, http_version, headers = self._get_data(conn)
-        version = headers.get('sec-websocket-version')
+        version = self._get_version(headers)
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
         websocket = WSType(_sock = conn)
@@ -105,6 +111,14 @@ class _WebSocket(socket.SocketType):
         """
 
         raise NotImplementedError
+
+    def _get_version(self, headers):
+        version = headers.get('sec-websocket-version')
+
+        if not version and 'sec-websocket-key1' in headers:
+            return '0'
+
+        return version
 
     def _get_data(self, conn):
         """
@@ -152,8 +166,25 @@ class _WebSocket(socket.SocketType):
 
 websocket = WebSocketType = _WebSocket
 
+class _WebSocketDraftHybi00(WebSocketType):
+    version = WEBSOCK_VERSION_DRAFT_HYBI_00
+
+    @functools.wraps(WebSocketType.server_handshake)
+    def server_handshake(self, http_method, path, http_version, headers):
+        pass
+    
+    @_wraps_builtin(WebSocketType.close)
+    def close(self):
+        pass
+
+    @_wraps_builtin(WebSocketType.send)
+    def send(self, data, flags = 0):
+        pass
+    
+
 class _WebSocketDraftHybi07(WebSocketType):
-    version = '7'
+    version = WEBSOCK_VERSION_DRAFT_HYBI_07
+
     _GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
     _SERVER_HANDSHAKE = (
         'HTTP/1.1 101 Switching Protocols\r\n'
