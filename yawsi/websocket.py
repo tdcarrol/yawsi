@@ -79,7 +79,8 @@ class _WebSocket(socket.SocketType):
     def accept(self):
         conn, addr = super(self.__class__, self).accept()
 
-        http_method, self.path, http_version, headers = self.__get_data(conn)
+        data = self.__get_data(conn)
+        http_method, self.request_uri, http_version, headers = data
         version = self.__get_version(headers)
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
@@ -148,11 +149,11 @@ class _WebSocket(socket.SocketType):
         if len(request) < 3:
             raise # TODO
 
-        http_method, path, http_version = request
+        http_method, request_uri, http_version = request
         headers = dict(self.__parse_header(line) for line in lines[1:] if
                                            line.strip())
 
-        return http_method, path, http_version, headers
+        return http_method, request_uri, http_version, headers
 
     def __parse_header(self, line):
         raw_header, _, raw_value = line.partition(u':')
