@@ -62,7 +62,9 @@ class _WebSocket(socket.SocketType):
     def __init__(self, family = socket.AF_INET, type = socket.SOCK_STREAM,
                  proto = 0, _sock = None):
         super(_WebSocket, self).__init__(family, type, proto, _sock)
+        self._rebind_delegates()
 
+    def _rebind_delegates(self):
         for method in socket._delegate_methods:
             if hasattr(self.__class__, method):
                 cls_method = getattr(self.__class__, method)
@@ -74,13 +76,13 @@ class _WebSocket(socket.SocketType):
     def accept(self):
         conn, addr = super(self.__class__, self).accept()
 
-        http_method, self.path, http_version, headers = self._get_data(conn)
-        version = self._get_version(headers)
+        http_method, self.path, http_version, headers = self.__get_data(conn)
+        version = self.__get_version(headers)
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
         websocket = WSType(_sock = conn)
-        websocket.server_handshake(http_method, self.path, http_version,
-                                   headers)
+        websocket._server_handshake(http_method, self.path, http_version,
+                                    headers)
 
         return websocket, addr
 
@@ -96,7 +98,7 @@ class _WebSocket(socket.SocketType):
     def makefile(self, mode = 'r', bufsize = -1):
         return socket._fileobject(self, mode, bufsize)
 
-    def server_handshake(self, http_method, path, http_version, headers):
+    def _server_handshake(self, http_method, path, http_version, headers):
         """
 
 
@@ -104,7 +106,7 @@ class _WebSocket(socket.SocketType):
 
         raise NotImplementedError
 
-    def client_handshake(self, headers):
+    def _client_handshake(self, headers):
         """
 
 
@@ -112,7 +114,7 @@ class _WebSocket(socket.SocketType):
 
         raise NotImplementedError
 
-    def _get_version(self, headers):
+    def __get_version(self, headers):
         version = headers.get('sec-websocket-version')
 
         if not version and 'sec-websocket-key1' in headers:
@@ -120,7 +122,7 @@ class _WebSocket(socket.SocketType):
 
         return version
 
-    def _get_data(self, conn):
+    def __get_data(self, conn):
         """
 
 
@@ -144,12 +146,12 @@ class _WebSocket(socket.SocketType):
             raise # TODO
 
         http_method, path, http_version = request
-        headers = dict(self._parse_header(line) for line in lines[1:] if
-                                          line.strip())
+        headers = dict(self.__parse_header(line) for line in lines[1:] if
+                                           line.strip())
 
         return http_method, path, http_version, headers
 
-    def _parse_header(self, line):
+    def __parse_header(self, line):
         raw_header, _, raw_value = line.partition(u':')
 
         header = raw_header.lower().strip()
@@ -169,8 +171,8 @@ websocket = WebSocketType = _WebSocket
 class _WebSocketDraftHybi00(WebSocketType):
     version = WEBSOCK_VERSION_DRAFT_HYBI_00
 
-    @functools.wraps(WebSocketType.server_handshake)
-    def server_handshake(self, http_method, path, http_version, headers):
+    @functools.wraps(WebSocketType._server_handshake)
+    def _server_handshake(self, http_method, path, http_version, headers):
         pass
     
     @_wraps_builtin(WebSocketType.close)
@@ -194,8 +196,8 @@ class _WebSocketDraftHybi07(WebSocketType):
         '\r\n'
     )
 
-    @functools.wraps(WebSocketType.server_handshake)
-    def server_handshake(self, http_method, path, http_version, headers):
+    @functools.wraps(WebSocketType._server_handshake)
+    def _server_handshake(self, http_method, path, http_version, headers):
         client_key = headers['sec-websocket-key']
         hash = hashlib.sha1(client_key + self._GUID).digest()
         key = base64.b64encode(hash)
