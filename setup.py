@@ -29,7 +29,7 @@ setuptools.setup(
     install_requires = install_requires,
     tests_require = tests_require,
     test_suite = 'tests',
-    license = 'License :: OSI Approved :: MIT License',
+    license = 'MIT',
     classifiers = (
         'Development Status :: 3 - Alpha',
         'Environment :: Web Environment',
