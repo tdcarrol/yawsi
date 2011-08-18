@@ -116,7 +116,7 @@ class _WebSocket(socket.SocketType):
         version = headers.get('sec-websocket-version')
 
         if not version and 'sec-websocket-key1' in headers:
-            return '0'
+            return WEBSOCK_VERSION_DRAFT_HYBI_00
 
         return version
 
