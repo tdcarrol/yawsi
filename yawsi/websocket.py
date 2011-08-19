@@ -78,17 +78,23 @@ class _WebSocket(socket.SocketType):
     @_wraps_builtin(socket.SocketType.accept)
     def accept(self):
         conn, addr = super(self.__class__, self).accept()
+        websocket = self._get_protocol_websocket(conn)
 
-        data = self.__get_data(conn)
-        http_method, self.request_uri, http_version, headers = data
-        version = self.__get_version(headers)
+        return websocket, addr
+
+    @classmethod
+    def _get_protocol_websocket(cls, conn):
+        data = cls.__get_data(conn)
+        http_method, request_uri, http_version, headers = data
+        version = cls.__get_version(headers)
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
         websocket = WSType(_sock = conn)
-        websocket._server_handshake(http_method, self.path, http_version,
-                                    headers)
+        websocket.request_uri = request_uri
+        websocket._server_handshake(http_method, websocket.request_uri,
+                                    http_version, headers)
 
-        return websocket, addr
+        return websocket
 
     @_wraps_builtin(socket.SocketType.dup)
     def dup(self):
@@ -118,7 +124,8 @@ class _WebSocket(socket.SocketType):
 
         raise NotImplementedError
 
-    def __get_version(self, headers):
+    @classmethod
+    def __get_version(cls, headers):
         version = headers.get('sec-websocket-version')
 
         if not version and 'sec-websocket-key1' in headers:
@@ -126,7 +133,8 @@ class _WebSocket(socket.SocketType):
 
         return version
 
-    def __get_data(self, conn):
+    @classmethod
+    def __get_data(cls, conn):
         """
 
 
@@ -150,12 +158,13 @@ class _WebSocket(socket.SocketType):
             raise # TODO
 
         http_method, request_uri, http_version = request
-        headers = dict(self.__parse_header(line) for line in lines[1:] if
-                                           line.strip())
+        headers = dict(cls.__parse_header(line) for line in lines[1:] if
+                                         line.strip())
 
         return http_method, request_uri, http_version, headers
 
-    def __parse_header(self, line):
+    @classmethod
+    def __parse_header(cls, line):
         raw_header, _, raw_value = line.partition(u':')
 
         header = raw_header.lower().strip()
@@ -239,6 +248,9 @@ class _WebSocketDraftHybi07(WebSocketType):
 
         return payload_len
 
+
+def create_websocket_from_connection(conn):
+    return WebSocketType._get_protocol_websocket(conn)
 
 @functools.wraps(socket.create_connection)
 def create_connection(address, timeout = None, source_address = None):
