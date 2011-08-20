@@ -51,14 +51,9 @@ class _WebSocketType(type):
 
 
 class _WebSocket(socket.SocketType):
-    """
-
-
-    """
+    __doc__ = socket.SocketType.__doc__
 
     __metaclass__ = _WebSocketType
-
-    __doc__ = socket.SocketType.__doc__
 
     path = None
 
@@ -212,8 +207,8 @@ class _WebSocketDraftHybi07(WebSocketType):
     @functools.wraps(WebSocketType._server_handshake)
     def _server_handshake(self, http_method, path, http_version, headers):
         client_key = headers['sec-websocket-key']
-        hash = hashlib.sha1(client_key + self._GUID).digest()
-        key = base64.b64encode(hash)
+        hashed_key = hashlib.sha1(client_key + self._GUID).digest()
+        key = base64.b64encode(hashed_key)
 
         handshake = self._SERVER_HANDSHAKE % {'key': key}
         super(self.__class__, self).send(handshake)
