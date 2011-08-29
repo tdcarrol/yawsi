@@ -19,7 +19,7 @@ if sys.version_info < (2, 7):
 
 setuptools.setup(
     name = 'yawsi',
-    version = '0.0.1',
+    version = '0.0.1a1',
     description = '',
     keywords = (''),
     url = 'https://github.com/dangle/yawsi',
