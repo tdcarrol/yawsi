@@ -225,7 +225,7 @@ class _WebSocketDraftHybi07(WebSocketType):
 
     @_wraps_builtin(WebSocketType.send)
     def send(self, data, flags = 0):
-        if isinstance(data, memoryview):
+        if hasattr(data, 'tobytes'):
             data = data.tobytes()
 
         data = data.encode('utf-8')
