@@ -215,9 +215,13 @@ class _WebSocketDraftHybi07(WebSocketType):
 
     @_wraps_builtin(WebSocketType.close)
     def close(self):
-        # TODO: Close correctly.
-        super(self.__class__, self).send('\x88')
-        super(self.__class__, self).close()
+        try:
+            # TODO: Close correctly.
+            super(self.__class__, self).send('\x88')
+        except:
+            pass
+        finally:
+            super(self.__class__, self).close()
 
     @_wraps_builtin(WebSocketType.send)
     def send(self, data, flags = 0):
