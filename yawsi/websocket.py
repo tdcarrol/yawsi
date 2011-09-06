@@ -181,7 +181,11 @@ class _WebSocketDraftHybi00(WebSocketType):
         'HTTP/1.1 101 Web Socket Protocol Handshake\r\n'
         'Upgrade: WebSocket\r\n'
         'Connection: Upgrade\r\n'
+        'Sec-WebSocket-Origin: %(origin)s\r\n'
+        'Sec-WebSocket-Protocol: %(protocol)s\r\n'
+        'Sec-WebSocket-Location: ws://%(netloc)s%(path)s\r\n'
         '\r\n'
+        '%(digest)s'
     )
 
     @functools.wraps(WebSocketType._server_handshake)
@@ -193,11 +197,17 @@ class _WebSocketDraftHybi00(WebSocketType):
                                          headers['sec-websocket-key2'])
         key3 = content
 
-        challenge = struct.pack('!I', key1) + struct.pack('!I', key2) + key3
+        challenge = struct.pack('>II', key1, key2) + key3
         hashed = hashlib.md5(challenge).digest()
+        params = {
+            'origin': headers.get('origin'),
+            'protocol': headers.get('protocol'),
+            'netloc': 'localhost:8888', # TODO: fixme!
+            'path': path,
+            'digest': hashed
+        }
 
-        super(self.__class__, self).send(self._SERVER_HANDSHAKE)
-        super(self.__class__, self).send(hashed)
+        super(self.__class__, self).send(self._SERVER_HANDSHAKE % params)
 
     def _calculate_key_value(self, value):
         num_chars = int(re.sub(r'\D', '', value))
@@ -207,7 +217,6 @@ class _WebSocketDraftHybi00(WebSocketType):
     @_wraps_builtin(WebSocketType.close)
     def close(self):
         try:
-            # TODO: Close correctly.
             super(self.__class__, self).send('\xFF')
         except:
             pass
@@ -218,10 +227,10 @@ class _WebSocketDraftHybi00(WebSocketType):
     def send(self, data, flags = 0):
         if hasattr(data, 'tobytes'):
             data = data.tobytes()
+
         data = data.encode('utf-8')
         packet = '\x00' + data + '\xFF'
-        import time
-        time.sleep(10)
+
         return super(self.__class__, self).send(packet)
 
 
@@ -250,7 +259,6 @@ class _WebSocketDraftHybi07(WebSocketType):
     @_wraps_builtin(WebSocketType.close)
     def close(self):
         try:
-            # TODO: Close correctly.
             super(self.__class__, self).send('\x88')
         except:
             pass
