@@ -183,7 +183,7 @@ class _WebSocketDraftHybi00(WebSocketType):
         'Connection: Upgrade\r\n'
         'Sec-WebSocket-Origin: %(origin)s\r\n'
         'Sec-WebSocket-Protocol: %(protocol)s\r\n'
-        'Sec-WebSocket-Location: ws://%(netloc)s%(path)s\r\n'
+        'Sec-WebSocket-Location: %(scheme)s://%(host)s%(path)s\r\n'
         '\r\n'
         '%(digest)s'
     )
@@ -197,12 +197,14 @@ class _WebSocketDraftHybi00(WebSocketType):
                                          headers['sec-websocket-key2'])
         key3 = content
 
+        origin = headers.get('origin')
         challenge = struct.pack('>II', key1, key2) + key3
         hashed = hashlib.md5(challenge).digest()
         params = {
-            'origin': headers.get('origin'),
+            'origin': origin,
+            'scheme': 'wss' if (origin or '').startswith('https') else 'ws',
             'protocol': headers.get('sec-websocket-protocol'),
-            'netloc': 'localhost:8888', # TODO: fixme!
+            'host': headers.get('host'),
             'path': path,
             'digest': hashed
         }
