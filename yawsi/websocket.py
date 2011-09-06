@@ -5,8 +5,11 @@
 """
 
 import base64
+import BaseHTTPServer as http
 import functools
 import hashlib
+import re
+import struct
 import types
 import urlparse
 
@@ -28,6 +31,19 @@ WEBSOCK_VERSION_DRAFT_HYBI_10 = '10'
 
 _wraps_builtin = functools.partial(functools.wraps, updated = (),
                                    assigned = ('__name__', '__doc__'))
+
+class _WebSocketRequestHandler(http.BaseHTTPRequestHandler):
+    """
+
+
+    """
+
+    default_request_version = 'HTTP/1.1'
+    handler = http.BaseHTTPRequestHandler.handle_one_request
+
+    def do_GET(self):
+        self.content = self.rfile._rbuf.getvalue()
+
 
 class _WebSocketType(type):
     """
@@ -55,7 +71,7 @@ class _WebSocket(socket.SocketType):
 
     __metaclass__ = _WebSocketType
 
-    path = None
+    request_uri = None
 
     def __init__(self, family = socket.AF_INET, type = socket.SOCK_STREAM,
                  proto = 0, _sock = None):
@@ -73,21 +89,21 @@ class _WebSocket(socket.SocketType):
     @_wraps_builtin(socket.SocketType.accept)
     def accept(self):
         conn, addr = super(self.__class__, self).accept()
-        websocket = self._get_protocol_websocket(conn)
+        websocket = self._get_protocol_websocket(conn, addr)
 
         return websocket, addr
 
     @classmethod
-    def _get_protocol_websocket(cls, conn):
-        data = cls.__get_data(conn)
-        http_method, request_uri, http_version, headers = data
+    def _get_protocol_websocket(cls, conn, addr):
+        data = cls.__get_data(conn, addr)
+        http_method, request_uri, http_version, headers, content = data
         version = cls.__get_version(headers)
 
         WSType = _WebSocketType._classes.get(version, WebSocketType)
         websocket = WSType(_sock = conn)
         websocket.request_uri = request_uri
         websocket._server_handshake(http_method, websocket.request_uri,
-                                    http_version, headers)
+                                    http_version, headers, content)
 
         return websocket
 
@@ -103,7 +119,8 @@ class _WebSocket(socket.SocketType):
     def makefile(self, mode = 'r', bufsize = -1):
         return socket._fileobject(self, mode, bufsize)
 
-    def _server_handshake(self, http_method, path, http_version, headers):
+    def _server_handshake(self, http_method, path, http_version, headers,
+                          content):
         """
 
 
@@ -129,34 +146,15 @@ class _WebSocket(socket.SocketType):
         return version
 
     @classmethod
-    def __get_data(cls, conn):
+    def __get_data(cls, conn, addr):
         """
 
 
         """
 
-        def get_lines():
-            sockfile = conn.makefile()
-
-            while 1:
-                line = sockfile.readline()
-
-                if not line or not line.strip():
-                    raise StopIteration
-
-                yield line.strip()
-
-        lines = [line for line in get_lines()]
-        request = lines[0].split()
-
-        if len(request) < 3:
-            raise # TODO
-
-        http_method, request_uri, http_version = request
-        headers = dict(cls.__parse_header(line) for line in lines[1:] if
-                                         line.strip())
-
-        return http_method, request_uri, http_version, headers
+        parsed = _WebSocketRequestHandler(conn, addr, None)
+        return (parsed.command, parsed.path, parsed.request_version,
+                parsed.headers, parsed.content)
 
     @classmethod
     def __parse_header(cls, line):
@@ -179,17 +177,52 @@ websocket = WebSocketType = _WebSocket
 class _WebSocketDraftHybi00(WebSocketType):
     version = WEBSOCK_VERSION_DRAFT_HYBI_00
 
+    _SERVER_HANDSHAKE = (
+        'HTTP/1.1 101 Web Socket Protocol Handshake\r\n'
+        'Upgrade: WebSocket\r\n'
+        'Connection: Upgrade\r\n'
+        '\r\n'
+    )
+
     @functools.wraps(WebSocketType._server_handshake)
-    def _server_handshake(self, http_method, path, http_version, headers):
-        pass
+    def _server_handshake(self, http_method, path, http_version, headers,
+                          content):
+        key1 = self._calculate_key_value(headers.get('websocket-key1') or
+                                         headers['sec-websocket-key1'])
+        key2 = self._calculate_key_value(headers.get('websocket-key2') or
+                                         headers['sec-websocket-key2'])
+        key3 = content
+
+        challenge = struct.pack('!I', key1) + struct.pack('!I', key2) + key3
+        hashed = hashlib.md5(challenge).digest()
+
+        super(self.__class__, self).send(self._SERVER_HANDSHAKE)
+        super(self.__class__, self).send(hashed)
+
+    def _calculate_key_value(self, value):
+        num_chars = int(re.sub(r'\D', '', value))
+        num_spaces = re.subn(' ', '', value)[1]
+        return num_chars / num_spaces
 
     @_wraps_builtin(WebSocketType.close)
     def close(self):
-        pass
+        try:
+            # TODO: Close correctly.
+            super(self.__class__, self).send('\xFF')
+        except:
+            pass
+        finally:
+            super(self.__class__, self).close()
 
     @_wraps_builtin(WebSocketType.send)
     def send(self, data, flags = 0):
-        pass
+        if hasattr(data, 'tobytes'):
+            data = data.tobytes()
+        data = data.encode('utf-8')
+        packet = '\x00' + data + '\xFF'
+        import time
+        time.sleep(10)
+        return super(self.__class__, self).send(packet)
 
 
 class _WebSocketDraftHybi07(WebSocketType):
@@ -205,7 +238,8 @@ class _WebSocketDraftHybi07(WebSocketType):
     )
 
     @functools.wraps(WebSocketType._server_handshake)
-    def _server_handshake(self, http_method, path, http_version, headers):
+    def _server_handshake(self, http_method, path, http_version, headers,
+                          content):
         client_key = headers['sec-websocket-key']
         hashed_key = hashlib.sha1(client_key + self._GUID).digest()
         key = base64.b64encode(hashed_key)
@@ -215,13 +249,17 @@ class _WebSocketDraftHybi07(WebSocketType):
 
     @_wraps_builtin(WebSocketType.close)
     def close(self):
-        # TODO: Close correctly.
-        super(self.__class__, self).send('\x88')
-        super(self.__class__, self).close()
+        try:
+            # TODO: Close correctly.
+            super(self.__class__, self).send('\x88')
+        except:
+            pass
+        finally:
+            super(self.__class__, self).close()
 
     @_wraps_builtin(WebSocketType.send)
     def send(self, data, flags = 0):
-        if isinstance(data, memoryview):
+        if hasattr(data, 'tobytes'):
             data = data.tobytes()
 
         data = data.encode('utf-8')
