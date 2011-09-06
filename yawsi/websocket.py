@@ -290,8 +290,8 @@ class _WebSocketDraftHybi07(WebSocketType):
         return payload_len
 
 
-def create_websocket_from_connection(conn):
-    return WebSocketType._get_protocol_websocket(conn)
+def create_websocket_from_connection(conn, address):
+    return WebSocketType._get_protocol_websocket(conn, address)
 
 @functools.wraps(socket.create_connection)
 def create_connection(address, timeout = None, source_address = None):
