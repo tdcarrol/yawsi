@@ -201,7 +201,7 @@ class _WebSocketDraftHybi00(WebSocketType):
         hashed = hashlib.md5(challenge).digest()
         params = {
             'origin': headers.get('origin'),
-            'protocol': headers.get('protocol'),
+            'protocol': headers.get('sec-websocket-protocol'),
             'netloc': 'localhost:8888', # TODO: fixme!
             'path': path,
             'digest': hashed
