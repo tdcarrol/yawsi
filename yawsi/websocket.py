@@ -272,7 +272,9 @@ class _WebSocketDraftHybi07(WebSocketType):
         if hasattr(data, 'tobytes'):
             data = data.tobytes()
 
-        data = data.encode('utf-8')
+        if isinstance(data, basestring):
+            data = unicode(data).encode('utf-8')
+
         payload_len = self._get_payload_length(data)
         packet = '\x81' + payload_len + data
 
