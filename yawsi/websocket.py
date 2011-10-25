@@ -27,6 +27,7 @@ __all__ = ('websocket', 'WebSocketType', 'WEBSOCK_VERSION_DRAFT_HIXIE_75',
 WEBSOCK_VERSION_DRAFT_HIXIE_75 = '75'
 WEBSOCK_VERSION_DRAFT_HYBI_00 = WEBSOCK_VERSION_DRAFT_HIXIE_76 = '0'
 WEBSOCK_VERSION_DRAFT_HYBI_07 = '7'
+WEBSOCK_VERSION_DRAFT_HYBI_07 = '8' #makes it work with firefox 7
 WEBSOCK_VERSION_DRAFT_HYBI_10 = '10'
 
 _wraps_builtin = functools.partial(functools.wraps, updated = (),
